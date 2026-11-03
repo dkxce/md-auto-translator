@@ -364,6 +364,7 @@ jobs:
 
 - [tdh9desktop](https://github.com/dkxce/tdh9desktop/blob/main/.github/workflows/translate.yml)      
 - [tdh9android](https://github.com/dkxce/tdh9android/blob/main/.github/workflows/translate.yml)     
+- [Tidradio-TD-H9](https://github.com/dkxce/Tidradio-TD-H9/blob/main/.github/workflows/translate.yml)     
 - [HTTPSrvLauncher](https://github.com/dkxce/HTTPSrvLauncher/blob/master/.github/workflows/translate.yml)     
 
 ## Поведение по умолчанию
