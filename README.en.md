@@ -2,7 +2,7 @@
 
 [RU](README.md) | [EN](README.en.md) | [Sample.](SAMPLE.md)
 
-Composite GitHub Action, which automatically translates Markdown files into Russian`.md`in English ()`.en.md`) and converts Markdown to DOCX. Used as a reusable action: any repository can invoke it through`uses:`.
+Composite GitHub Action, which automatically translates Markdown files into Russian`.md`in English ()`.en.md`) and converts Markdown to DOCX. Used as a reusable action: any repository can call it through`uses:`.
 
 ## Opportunities
 
@@ -34,23 +34,23 @@ and transmits parameters through`with:`. Action itself:
 | `github_token` | no | `${{ github.token }}` | Record token. Substitute automatically; the right to record`permissions: contents: write`in a challenging workflow. |
 | `translate_paths` | no | empty | Ways.`.md`files for translation (through space/line transfer). Empty = Autodetection of All`.md`. |
 | `convert_paths` | no | empty | Ways.`.md`Convert files to DOCX. Empty = everything`.md`. |
-| `translate_skip` | no | empty | Globe patterns for EXCLUSION from translation. Empty means translating everything. |
+| `translate_skip` | no | empty | Global patterns for EXCLUSION from translation. Empty means translating everything. |
 | `convert_skip` | no | empty | Global patterns for EXCLUSION from DOCX conversion. Empty = convert everything. |
 
-> **Paths and patterns.**Multiple values are given through space or line translation (YAML block).`: |`). The patterns allow globes:`*`(one directory),`**`(recursively)`?`(one symbol)
+> **Paths and patterns.**Multiple values are given through space or line translation (YAML block).`: |`). The patterns allow for globes:`*`(one directory),`**`(recursively)`?`(one symbol)
 
 ## Requirements for calling repositories
 
-In order for an external repository to pull the action, its workflow should include:
+In order for an external repository to pull the action, its workflow must include:
 
 * `permissions: contents: write`- or the commission's push won't pass;
 * step`actions/checkout@v4`with a standard token (credenshale Persian is enabled by default);
 
-## Examples.
+## Examples
 
 ### 1. Translation and conversion of all`. md`
 
-No file details. Autodetection is used: all are translated and converted`.md`except`*.en.md` и `README.md`.
+No file details. Autodetection is used: all are translated and converted`.md`except`*.en.md`.
 
 ```
 name: Auto Translate Docs
@@ -106,7 +106,7 @@ jobs:
 
 ### 3. Only conversion.
 
-Convert`.md`DOCX,**without**translation. Translation shuts down by globe`translate_skip: '**'`.
+Convert`.md`at DOCX,**without**translation. Translation shuts down by globe`translate_skip: '**'`.
 
 ```
 name: Auto Translate Docs
