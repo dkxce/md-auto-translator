@@ -1,4 +1,4 @@
-﻿# MD Auto Translator
+﻿# .MD RU → EN Auto Translator
 
 [RU](README.md) | [EN](README.en.md) | [SAMPLE](SAMPLE.md)         
 
