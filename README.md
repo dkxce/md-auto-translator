@@ -364,7 +364,7 @@ jobs:
 
 - [tdh9desktop](https://github.com/dkxce/tdh9desktop/blob/main/.github/workflows/translate.yml)      
 - [tdh9android](https://github.com/dkxce/tdh9android/blob/main/.github/workflows/translate.yml)     
-- [HTTPSrvLauncher](https://github.com/dkxce/HTTPSrvLauncher/blob/main/.github/workflows/translate.yml)     
+- [HTTPSrvLauncher](https://github.com/dkxce/HTTPSrvLauncher/blob/master/.github/workflows/translate.yml)     
 
 ## Поведение по умолчанию
 
