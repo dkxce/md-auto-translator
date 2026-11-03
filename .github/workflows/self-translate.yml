@@ -1,0 +1,22 @@
+name: Auto Translate Self
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'README.md'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  translate-self:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Self Translation
+        uses: ./
+        with:
+          translate_paths: README.md
+          convert_skip: '**'

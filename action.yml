@@ -1,0 +1,116 @@
+name: 'MD Translate & Convert to DOCX (Argos + Pandoc) RU -> EN'
+description: 'Automatically translates Russian .md files to English and builds DOCX'
+inputs:
+  github_token:
+    description: 'GitHub Token to push changes'
+    required: true
+    default: ${{ github.token }}
+  translate_paths:
+    description: 'Spaces/newline separated paths of .md files to translate (ru->en). Empty = auto-discover.'
+    required: false
+    default: ''
+  convert_paths:
+    description: 'Spaces/newline separated paths of .md files to convert to DOCX. Empty = all .md files.'
+    required: false
+    default: ''
+  translate_skip:
+    description: 'Spaces/newline separated paths to EXCLUDE from translation (globs allowed). Empty = translate all.'
+    required: false
+    default: ''
+  convert_skip:
+    description: 'Spaces/newline separated paths to EXCLUDE from DOCX conversion (globs allowed). Empty = convert all.'
+    required: false
+    default: ''
+
+runs:
+  using: "composite"
+  steps:
+    # 1. Устанавливаем Pandoc в систему
+    - name: Install Pandoc
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y pandoc
+
+    # 2. Настраиваем Python и пакеты
+    - name: Set up Python and Packages
+      shell: bash
+      run: |
+        pip install argostranslate beautifulsoup4 markdownify mistletoe transliterate markdown
+
+    # 3. Скачиваем языковую модель Argos
+    - name: Install Argos Model
+      shell: bash
+      run: |
+        python -c "
+        import argostranslate.package
+        print('Обновление индекса пакетов Argos...')
+        argostranslate.package.update_package_index()
+        available_packages = argostranslate.package.get_available_packages()
+        package_to_install = next(filter(lambda x: x.from_code == 'ru' and x.to_code == 'en', available_packages))
+        print(f'Скачивание и установка модели: {package_to_install}')
+        argostranslate.package.install_from_path(package_to_install.download())
+        print('Модель Argos успешно установлена!')
+        "
+
+    # 4. Запускаем скрипт перевода (передаем путь к экшену, чтобы Python нашел скрипт)
+    - name: Run HTML Tree Translate
+      shell: bash
+      env:
+        OMP_NUM_THREADS: "1"
+        MKL_NUM_THREADS: "1"
+        OPENBLAS_NUM_THREADS: "1"
+        TRANSLATE_PATHS: ${{ inputs.translate_paths }}
+        TRANSLATE_SKIP: ${{ inputs.translate_skip }}
+      run: |
+        python "${{ github.action_path }}/translate_html_tree.py"
+
+    # 5. Конвертируем в DOCX через Pandoc (convert_paths/convert_skip или все .md)
+    - name: Convert Markdown to DOCX
+      shell: bash
+      env:
+        CONVERT_PATHS: ${{ inputs.convert_paths }}
+        CONVERT_SKIP: ${{ inputs.convert_skip }}
+      run: |
+        skip_patterns="${{ inputs.convert_skip }}"
+        echo "SKIP_PATTERNS=[$skip_patterns]"
+        convert_file() {
+          f="$1"
+          for pat in $skip_patterns; do
+            case "$f" in
+              $pat) echo "  Пропуск (convert_skip): $f"; return 0;;
+            esac
+          done
+          echo "Конвертация: $f -> ${f%.md}.docx"
+          pandoc "$f" -o "${f%.md}.docx"
+        }
+        if [ -n "${{ inputs.convert_paths }}" ]; then
+          echo "Конвертация по convert_paths"
+          for f in ${{ inputs.convert_paths }}; do
+            if [ -f "$f" ]; then convert_file "$f"; fi
+          done
+        else
+          echo "Конвертация всех .md"
+          find . -type f -name "*.md" ! -name "*.en.md" | while read -r f; do
+            convert_file "$f"
+          done
+          find . -type f -name "*.en.md" | while read -r f; do
+            convert_file "$f"
+          done
+        fi
+
+    # 6. Коммитим изменения в вызывающий репозиторий
+    - name: Commit and Push Changes
+      shell: bash
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        
+        git add "*.en.md" "*.docx"
+        
+        if git diff --cached --quiet; then
+          echo "Нет новых файлов для отправки."
+        else
+          git commit -m "docs: auto-translate and convert to DOCX [skip ci]"
+          git push origin HEAD:${{ github.ref_name }}
+        fi
