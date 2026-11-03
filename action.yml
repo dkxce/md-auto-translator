@@ -110,6 +110,9 @@ runs:
         
         git add '*.en.md' 2>/dev/null || true
         git add '*.docx' 2>/dev/null || true
+        git status --porcelain
+        echo "--- diff cached ---"
+        git diff --cached --stat
         
         if git diff --cached --quiet; then
           echo "Нет новых файлов для отправки."
