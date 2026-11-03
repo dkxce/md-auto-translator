@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'README.md'
+      - 'SAMPLE.md'
   workflow_dispatch:
 
 permissions:
@@ -19,4 +20,4 @@ jobs:
         uses: ./
         with:
           translate_paths: README.md
-          convert_skip: '**'
+          convert_paths: SAMPLE.md

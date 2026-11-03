@@ -73,6 +73,8 @@ runs:
         CONVERT_SKIP: ${{ inputs.convert_skip }}
       run: |
         skip_patterns="${{ inputs.convert_skip }}"
+        # Отключаем глоб-раскрытие, чтобы паттерны оставались литеральными (напр. '**')
+        set -f
         echo "SKIP_PATTERNS=[$skip_patterns]"
         convert_file() {
           f="$1"
@@ -111,6 +113,6 @@ runs:
         if git diff --cached --quiet; then
           echo "Нет новых файлов для отправки."
         else
-          git commit -m "docs: auto-translate and convert to DOCX [skip ci]"
+          git commit -m "docs: auto-translate and convert to docx"
           git push origin HEAD:${{ github.ref_name }}
         fi

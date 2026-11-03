@@ -1,5 +1,7 @@
 ﻿# MD Auto Translator
 
+[RU](README.md) | [EN](README.en.md) | [SAMPLE](SAMPLE.md)         
+
 Composite GitHub Action, который автоматически переводит Markdown-файлы на русском (`.md`) в английский (`.en.md`) и конвертирует Markdown в DOCX. Используется как переиспользуемый экшен: любой репозиторий может вызвать его через `uses:`.
 
 ## Возможности
@@ -46,9 +48,9 @@ uses: dkxce/md-auto-translator@main
 
 ## Примеры
 
-### 1. Без указания файлов
+### 1. Перевод и конвертация всех `.md`
 
-Перевести и сконвертировать **всё** автоматически. Используется автообнаружение: находятся все `.md` кроме `*.en.md` и `README.md`.
+Без указания файлов. Используется автообнаружение: переводятся и конвертируются все `.md` кроме `*.en.md` и `README.md`.
 
 ```yaml
 name: Auto Translate Docs
@@ -73,9 +75,130 @@ jobs:
         with:
 ```
 
-### 2. С указанием файлов к переводу
+### 2. Только перевод
 
-Переводятся только перечисленные файлы. `convert_paths` не задан → конвертируются все `.md`.
+Перевести `README.md` в `README.en.md`, **без** конвертации в DOCX. Конвертация отключается глобом `convert_skip: '**'`.
+
+```yaml
+name: Auto Translate Self
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'README.md'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  translate-self:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Self Translation
+        uses: dkxce/md-auto-translator@main
+        with:
+          translate_paths: README.md
+          convert_skip: '**'
+```
+
+### 3. Только конвертация
+
+Сконвертировать `.md` в DOCX, **без** перевода. Перевод отключается глобом `translate_skip: '**'`.
+
+```yaml
+name: Auto Translate Docs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**/*.md'
+      - '!**/*.en.md'
+
+permissions:
+  contents: write
+
+jobs:
+  translate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Translator
+        uses: dkxce/md-auto-translator@main
+        with:
+          translate_skip: '**'
+          convert_paths: |
+            docs/ru/*.md
+```
+
+### 4. С указанием файлов к переводу (без конвертации)
+
+Переводятся только перечисленные файлы, конвертация отключена (`convert_skip: '**'`).
+
+```yaml
+name: Auto Translate Docs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**/*.md'
+      - '!**/*.en.md'
+
+permissions:
+  contents: write
+
+jobs:
+  translate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Translator
+        uses: dkxce/md-auto-translator@main
+        with:
+          translate_paths: |
+            docs/ru/intro.md
+            docs/ru/guide.md
+          convert_skip: '**'
+```
+
+### 5. С указанием файлов к конвертации (без перевода)
+
+Конвертируются только перечисленные файлы, перевод отключён (`translate_skip: '**'`).
+
+```yaml
+name: Auto Translate Docs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**/*.md'
+      - '!**/*.en.md'
+
+permissions:
+  contents: write
+
+jobs:
+  translate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Translator
+        uses: dkxce/md-auto-translator@main
+        with:
+          translate_skip: '**'
+          convert_paths: |
+            docs/ru/intro.md
+            docs/ru/guide.md
+```
+
+### 6. С указанием файлов к переводу (с конвертацией всех)
+
+Переводятся только перечисленные файлы, конвертации не указана → конвертируются все `.md`.
 
 ```yaml
 name: Auto Translate Docs
@@ -103,9 +226,9 @@ jobs:
             docs/ru/guide.md
 ```
 
-### 3. С указанием файлов к конвертации
+### 7. С указанием файлов к конвертации (с переводом всех)
 
-В DOCX конвертируются только указанные файлы. `translate_paths` не задан → переводятся все найденные `.md`.
+Конвертируются только перечисленные файлы, перевода не указан → переводятся все найденные `.md`.
 
 ```yaml
 name: Auto Translate Docs
@@ -132,7 +255,7 @@ jobs:
             docs/ru/*.md
 ```
 
-### 4. И перевод, и конвертация по конкретным файлам
+### 8. И перевод, и конвертация по конкретным файлам
 
 Явно заданы оба списка: переводятся одни файлы, конвертируются другие (могут пересекаться, обрабатываются независимо).
 
@@ -166,7 +289,7 @@ jobs:
             docs/ru/guide.md
 ```
 
-### 5. С фильтрами пропуска (все кроме)
+### 9. С фильтрами пропуска (все кроме)
 
 Обрабатываются **все** файлы (и перевод, и конвертация), **кроме** тех, что подпадают под глобы в `translate_skip` / `convert_skip`.
 
