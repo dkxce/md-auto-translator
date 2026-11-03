@@ -360,6 +360,11 @@ jobs:
             docs/ru/draft-*.md
 ```
 
+## Examples of repositories using automatic translation
+
+* [tdh9desktop](https://github.com/dkxce/tdh9desktop) - [Example:](https://github.com/dkxce/tdh9desktop/blob/main/.github/workflows/translate.yml)
+* [tdh9android](https://github.com/dkxce/tdh9android) - [Example:](https://github.com/dkxce/tdh9android/blob/main/.github/workflows/translate.yml)
+
 ## Default behaviour
 
 Priority table:
