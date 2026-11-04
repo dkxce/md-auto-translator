@@ -134,7 +134,8 @@ for input_path in files_to_translate:
     # 2. Вытаскиваем исходную разметку Маркдауна ![]()
     md_matches = re.findall(r'(!\[[^\]]*?\]\(([^)]+?)\))', md_content)
     for full_tag, src in md_matches:
-        clean_src = src.strip().split()[0].strip('"').strip("'") if src.strip() else ""
+        # Убрали .split(), теперь пути с пробелами обрабатываются целиком
+        clean_src = src.strip().strip('"').strip("'") if src.strip() else ""
         if clean_src.lower().endswith(IMAGE_EXTENSIONS):
             orig_md_images.append((clean_src, full_tag.strip()))
 
@@ -192,7 +193,8 @@ for input_path in files_to_translate:
     markdown_img_regex = r'!\[(.*?)\]\((.*?)\)'
     def replace_with_html_img(match):
         alt_text = match.group(1)
-        src_part = match.group(2).strip().split()[0].strip('"').strip("'") if match.group(2).strip() else ""
+        # Убрали .split(), чтобы сохранить целостность путей с пробелами
+        src_part = match.group(2).strip().strip('"').strip("'") if match.group(2).strip() else ""
         return f'<img src="{src_part}" alt="{alt_text}" />'
     
     translated_md = re.sub(markdown_img_regex, replace_with_html_img, translated_md)
