@@ -134,15 +134,20 @@ for input_path in files_to_translate:
     # Шаг 3: Сборка и сохранение готового Markdown перевода
     translated_html = str(soup)
     
-    def keep_html_img(el, text, convert_as_inline):
-        attrs_str = " ".join([f'{k}="{v}"' for k, v in el.attrs.items()])
-        return f"<{el.name} {attrs_str} />"
+    def keep_html_img(el, **kwargs):
+        attrs = []
+        for k, v in el.attrs.items():
+            if isinstance(v, list):
+                v = " ".join(v)
+            attrs.append(f'{k}="{v}"')
+        attrs_str = " " + " ".join(attrs) if attrs else ""
+        return f"<img{attrs_str} />"
 
     translated_md = mdify(
         translated_html, 
         heading_style="ATX", 
         strip=['script', 'style'],
-        custom_converters={'img': keep_html_img}  # Заставляем markdownify не трогать картинки
+        img_converter=keep_html_img
     )
     translated_md = re.sub(r'\n{3,}', '\n\n', translated_md)
 
