@@ -9,9 +9,14 @@ from transliterate import slugify
 import argostranslate.translate
 
 def parse_env_list(env_name):
-    """Читает вход из env: пути через пробел или перевод строки"""
+    """Читает вход из env строго по строкам, игнорируя пустые"""
     raw = os.environ.get(env_name, "").strip()
-    return [p for p in raw.replace("\n", " ").split() if p.strip()]
+    if not raw:
+        return []
+    # Разделяем только по символу перевода строки
+    paths = [p.strip().strip('"').strip("'") for p in raw.split("\n") if p.strip()]
+    return paths
+
 
 def apply_skips(paths, skip_patterns):
     """Оставляет только те пути, которые не подпадают ни под один glob-паттерн из skip_patterns"""
