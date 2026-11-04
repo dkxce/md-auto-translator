@@ -1,4 +1,5 @@
 import os
+import glob
 import subprocess
 import fnmatch
 
@@ -42,14 +43,32 @@ def main():
 
     if convert_paths:
         print("Конвертация по convert_paths")
-        for f in convert_paths:
+        files_to_process = []
+        
+        for path_pattern in convert_paths:
+            # Если в строке есть маски вроде * или **, раскрываем их динамически
+            if "*" in path_pattern or "?" in path_pattern:
+                # recursive=True позволяет обрабатывать ** (поиск во всех подпапках)
+                matched_files = glob.glob(path_pattern, recursive=True)
+                for f in matched_files:
+                    if os.path.isfile(f) and f.endswith(".md"):
+                        files_to_process.append(os.path.relpath(f, "."))
+            else:
+                # Если это обычный путь, добавляем как есть
+                files_to_process.append(path_pattern)
+
+        # Удаляем дубликаты с сохранением порядка
+        seen = set()
+        unique_files = [x for x in files_to_process if not (x in seen or seen.add(x))]
+
+        # Запускаем конвертацию только для того, что было явно найдено или указано
+        for f in unique_files:
             convert_file(f, convert_skip)
+            
     else:
         print("Конвертация всех .md")
-        # Ищем все .md файлы в текущем репозитории, включая вложенные папки
         all_md_files = []
         for root, dirs, files in os.walk("."):
-            # Игнорируем скрытые папки (например, .git)
             dirs[:] = [d for d in dirs if not d.startswith('.')]
             for file in files:
                 if file.endswith(".md"):
@@ -57,7 +76,6 @@ def main():
                     clean_path = os.path.relpath(full_path, ".")
                     all_md_files.append(clean_path)
 
-        # Сначала обрабатываем обычные .md, затем переведенные .en.md
         ru_files = [f for f in all_md_files if not f.endswith(".en.md")]
         en_files = [f for f in all_md_files if f.endswith(".en.md")]
 
@@ -65,6 +83,7 @@ def main():
             convert_file(f, convert_skip)
         for f in en_files:
             convert_file(f, convert_skip)
+
 
 if __name__ == "__main__":
     main()

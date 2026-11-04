@@ -1,6 +1,7 @@
 import os
 import re
 import sys
+import glob
 import fnmatch
 import markdown
 from bs4 import BeautifulSoup, NavigableString
@@ -16,7 +17,6 @@ def parse_env_list(env_name):
     # Разделяем только по символу перевода строки
     paths = [p.strip().strip('"').strip("'") for p in raw.split("\n") if p.strip()]
     return paths
-
 
 def apply_skips(paths, skip_patterns):
     """Оставляет только те пути, которые не подпадают ни под один glob-паттерн из skip_patterns"""
@@ -59,15 +59,33 @@ def find_russian_markdown_files():
                 target_files.append(clean_path)
     return target_files
 
-# Если вызваны явные пути через TRANSLATE_PATHS — используем их,
-# иначе поиск файлов выполняется автоматически по всему репозиторию
+def resolve_glob_paths(raw_paths):
+    """Принимает список путей, раскрывает glob-маски (*, **) и возвращает уникальные пути к .md файлам"""
+    resolved = []
+    for path_pattern in raw_paths:
+        if "*" in path_pattern or "?" in path_pattern:
+            # Превращаем маски типа **/*.md в реальные файлы на диске
+            matched_files = glob.glob(path_pattern, recursive=True)
+            for f in matched_files:
+                if os.path.isfile(f) and f.endswith(".md"):
+                    resolved.append(os.path.relpath(f, "."))
+        else:
+            resolved.append(path_pattern)
+    
+    # Удаляем дубликаты с сохранением порядка
+    seen = set()
+    return [x for x in resolved if not (x in seen or seen.add(x))]
+
+# Основная логика получения путей
 skip_patterns = parse_env_list("TRANSLATE_SKIP")
 
 if os.environ.get("TRANSLATE_PATHS", "").strip():
-    files_to_translate = parse_env_list("TRANSLATE_PATHS")
+    raw_translate_paths = parse_env_list("TRANSLATE_PATHS")
+    files_to_translate = resolve_glob_paths(raw_translate_paths)
 else:
     files_to_translate = find_russian_markdown_files()
 
+# Фильтруем исключения
 files_to_translate = apply_skips(files_to_translate, skip_patterns)
 
 if not files_to_translate:
@@ -155,7 +173,6 @@ for input_path in files_to_translate:
         img_converter=keep_html_img
     )
     translated_md = re.sub(r'\n{3,}', '\n\n', translated_md)
-
 
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(translated_md)

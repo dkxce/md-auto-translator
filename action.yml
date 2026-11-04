@@ -82,8 +82,10 @@ runs:
         git config --local user.email "github-actions[bot]@users.noreply.github.com"
         git config --local user.name "github-actions[bot]"
         
-        git add '*.en.md' 2>/dev/null || true
-        git add '*.docx' 2>/dev/null || true
+        # Используем флаг -f, чтобы обойти возможные правила .gitignore для сгенерированных файлов
+        git add -f '*.en.md' 2>/dev/null || true
+        git add -f '*.docx' 2>/dev/null || true
+        
         git status --porcelain
         echo "--- diff cached ---"
         git diff --cached --stat
@@ -94,3 +96,4 @@ runs:
           git commit -m "docs: auto-translate and convert to docx"
           git push origin HEAD:${{ github.ref_name }}
         fi
+
