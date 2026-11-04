@@ -94,6 +94,8 @@ if not files_to_translate:
 
 print(f"Найдено файлов для обработки: {len(files_to_translate)}")
 
+successful_count = 0
+
 for input_path in files_to_translate:
     if not os.path.exists(input_path):
         print(f"Предупреждение: Файл {input_path} не найден, пропускаем.")
@@ -140,10 +142,15 @@ for input_path in files_to_translate:
         anchor_tag = soup.new_tag("a", attrs={"name": new_slug})
         heading.append(anchor_tag)
 
-    # Шаг 2: Перевод контента и обновление локальных ссылок
+    # Шаг 2: Перевод контента, атрибутов alt у картинок и обновление локальных ссылок
     for tag in soup.find_all(True):
         if tag.name in ['code', 'pre']:
             continue
+            
+        # Переводим alt-текст у картинок, если он есть
+        if tag.name == 'img' and tag.has_attr('alt'):
+            tag['alt'] = translate_text(tag['alt'])
+            
         if tag.name == 'a' and tag.has_attr('href'):
             href = tag['href'].lower()
             if href.startswith('#') and href in anchor_mapping:
@@ -154,29 +161,36 @@ for input_path in files_to_translate:
                 if tag.name not in ['code', 'pre'] and child.parent.name not in ['code', 'pre']:
                     child.replace_with(translate_text(child))
 
-    # Шаг 3: Сборка и сохранение готового Markdown перевода
+    # Шаг 3: Сборка Markdown и принудительная конвертация картинок в HTML теги <img />
     translated_html = str(soup)
-    
-    def keep_html_img(el, **kwargs):
-        attrs = []
-        for k, v in el.attrs.items():
-            if isinstance(v, list):
-                v = " ".join(v)
-            attrs.append(f'{k}="{v}"')
-        attrs_str = " " + " ".join(attrs) if attrs else ""
-        return f"<img{attrs_str} />"
 
+    # Базовая конвертация в Markdown
     translated_md = mdify(
         translated_html, 
         heading_style="ATX", 
-        strip=['script', 'style'],
-        img_converter=keep_html_img
+        strip=['script', 'style']
     )
+    
+    # Регулярное выражение, которое находит ![alt](src) и превращает в <img src="src" alt="alt" />
+    # Оно корректно обрабатывает экранированные скобки внутри путей
+    markdown_img_regex = r'!\[(.*?)\]\((.*?)\)'
+    
+    def replace_with_html_img(match):
+        alt_text = match.group(1)
+        img_src = match.group(2)
+        # Возвращаем чистый HTML-тег
+        return f'<img src="{img_src}" alt="{alt_text}" />'
+        
+    # Принудительно заменяем синтаксис обратно на HTML-теги
+    translated_md = re.sub(markdown_img_regex, replace_with_html_img, translated_md)
+    
+    # Очистка дублирующихся переносов строк
     translated_md = re.sub(r'\n{3,}', '\n\n', translated_md)
 
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(translated_md)
 
     print(f"Успешно сохранен перевод: {output_path}")
+    successful_count += 1
 
-print("\nВсе обнаруженные файлы успешно обработаны!")
+print(f"\nВсе обнаруженные файлы успешно обработаны! Всего переведено: {successful_count}")

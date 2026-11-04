@@ -13,17 +13,18 @@ def parse_env_list(env_name):
     return paths
 
 def convert_file(file_path, skip_patterns):
-    """Проверяет паттерны исключений и конвертирует файл через Pandoc"""
+    """Проверяет паттерны исключений и конвертирует файл через Pandoc.
+    Возвращает True в случае успеха, иначе False."""
     if not os.path.exists(file_path):
         print(f"Предупреждение: Файл не найден: {file_path}")
-        return
+        return False
 
     base_name = os.path.basename(file_path)
     # Проверка skip_patterns (поддержка glob-масок)
     if skip_patterns:
         if any(fnmatch.fnmatch(file_path, pat) or fnmatch.fnmatch(base_name, pat) for pat in skip_patterns):
             print(f"  Пропуск (convert_skip): {file_path}")
-            return
+            return False
 
     # Формируем имя .docx
     if file_path.endswith(".md"):
@@ -34,12 +35,17 @@ def convert_file(file_path, skip_patterns):
     print(f"Конвертация: {file_path} -> {out_path}")
     try:
         subprocess.run(["pandoc", file_path, "-o", out_path], check=True)
+        return True
     except Exception as e:
         print(f"Ошибка при конвертации {file_path}: {e}")
+        return False
 
 def main():
     convert_paths = parse_env_list("CONVERT_PATHS")
     convert_skip = parse_env_list("CONVERT_SKIP")
+    
+    # Счетчик успешных конвертаций
+    successful_count = 0
 
     if convert_paths:
         print("Конвертация по convert_paths")
@@ -63,7 +69,8 @@ def main():
 
         # Запускаем конвертацию только для того, что было явно найдено или указано
         for f in unique_files:
-            convert_file(f, convert_skip)
+            if convert_file(f, convert_skip):
+                successful_count += 1
             
     else:
         print("Конвертация всех .md")
@@ -80,10 +87,14 @@ def main():
         en_files = [f for f in all_md_files if f.endswith(".en.md")]
 
         for f in ru_files:
-            convert_file(f, convert_skip)
+            if convert_file(f, convert_skip):
+                successful_count += 1
         for f in en_files:
-            convert_file(f, convert_skip)
+            if convert_file(f, convert_skip):
+                successful_count += 1
 
+    # Выводим итоговое число обработанных файлов
+    print(f"\nВсе файлы успешно обработаны! Всего сконвертировано: {successful_count}")
 
 if __name__ == "__main__":
     main()
