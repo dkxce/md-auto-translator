@@ -72,34 +72,8 @@ runs:
         CONVERT_PATHS: ${{ inputs.convert_paths }}
         CONVERT_SKIP: ${{ inputs.convert_skip }}
       run: |
-        skip_patterns="${{ inputs.convert_skip }}"
-        # Отключаем глоб-раскрытие, чтобы паттерны оставались литеральными (напр. '**')
-        set -f
-        echo "SKIP_PATTERNS=[$skip_patterns]"
-        convert_file() {
-          f="$1"
-          for pat in $skip_patterns; do
-            case "$f" in
-              $pat) echo "  Пропуск (convert_skip): $f"; return 0;;
-            esac
-          done
-          echo "Конвертация: $f -> ${f%.md}.docx"
-          pandoc "$f" -o "${f%.md}.docx"
-        }
-        if [ -n "${{ inputs.convert_paths }}" ]; then
-          echo "Конвертация по convert_paths"
-          for f in ${{ inputs.convert_paths }}; do
-            if [ -f "$f" ]; then convert_file "$f"; fi
-          done
-        else
-          echo "Конвертация всех .md"
-          find . -type f -name "*.md" ! -name "*.en.md" | while read -r f; do
-            convert_file "$f"
-          done
-          find . -type f -name "*.en.md" | while read -r f; do
-            convert_file "$f"
-          done
-        fi
+        python "${{ github.action_path }}/convert_md_to_docx.py"
+
 
     # 6. Коммитим изменения в вызывающий репозиторий
     - name: Commit and Push Changes
