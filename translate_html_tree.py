@@ -161,28 +161,26 @@ for input_path in files_to_translate:
                 if tag.name not in ['code', 'pre'] and child.parent.name not in ['code', 'pre']:
                     child.replace_with(translate_text(child))
 
-    # Шаг 3: Сборка Markdown и принудительная конвертация картинок в HTML теги <img />
+    # Шаг 3: Сборка и сохранение готового Markdown перевода с сохранением HTML-тегов картинок и их размеров
     translated_html = str(soup)
+    
+    def keep_html_img(el, **kwargs):
+        """Конвертер, который собирает HTML-тег <img> обратно со ВСЕМИ атрибутами (width, height и т.д.)"""
+        attrs = []
+        for k, v in el.attrs.items():
+            if isinstance(v, list):
+                v = " ".join(v)
+            attrs.append(f'{k}="{v}"')
+        attrs_str = " " + " ".join(attrs) if attrs else ""
+        return f"<img{attrs_str} />"
 
-    # Базовая конвертация в Markdown
+    # Конвертируем в Markdown, защищая теги <img> от превращения в ![]()
     translated_md = mdify(
         translated_html, 
         heading_style="ATX", 
-        strip=['script', 'style']
+        strip=['script', 'style'],
+        custom_converters={'img': keep_html_img}  # Заставляем markdownify возвращать оригинальный HTML-тег со всеми атрибутами
     )
-    
-    # Регулярное выражение, которое находит ![alt](src) и превращает в <img src="src" alt="alt" />
-    # Оно корректно обрабатывает экранированные скобки внутри путей
-    markdown_img_regex = r'!\[(.*?)\]\((.*?)\)'
-    
-    def replace_with_html_img(match):
-        alt_text = match.group(1)
-        img_src = match.group(2)
-        # Возвращаем чистый HTML-тег
-        return f'<img src="{img_src}" alt="{alt_text}" />'
-        
-    # Принудительно заменяем синтаксис обратно на HTML-теги
-    translated_md = re.sub(markdown_img_regex, replace_with_html_img, translated_md)
     
     # Очистка дублирующихся переносов строк
     translated_md = re.sub(r'\n{3,}', '\n\n', translated_md)
