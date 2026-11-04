@@ -119,20 +119,20 @@ for input_path in files_to_translate:
         md_content = f.read()
 
     # =========================================================================
-    # ШАГ 1 АЛГОРИТМА: Собираем оригинальные картинки из исходного текста
+    # ШАГ 1 АЛГОРИТМА: Собираем оригинальные картинки из исходного текста (До перевода)
     # =========================================================================
-    original_images = [] # Список кортежей: (путь_к_картинке, вся_оригинальная_строка_тега)
+    original_images = [] # Список кортежей: (чистый_путь, оригинальный_тег)
     
-    # 1. Ищем HTML-теги <img ... />
-    html_img_matches = re.findall(r'(<img\s+[^>]*src=["\']([^"\']+)["\'][^>]*>)', md_content)
+    # 1. Ищем HTML-теги <img ... /> (ленивый поиск `.*?` до закрывающего `>`)
+    html_img_matches = re.findall(r'(<img\s+[^>]*?src=["\']([^"\']+)["\'][^>]*?>)', md_content)
     for full_tag, src in html_img_matches:
         original_images.append((src.strip(), full_tag.strip()))
         
-    # 2. Ищем синтаксис маркдауна ![alt](src)
-    md_img_matches = re.findall(r'(!\[(.*?)\]\((.*?)\))', md_content)
-    for full_tag, alt, src in md_img_matches:
-        # Если путь содержит параметры или пробелы, берем до первого пробела/кавычки
-        clean_src = src.split()[0].strip() if src.strip() else ""
+    # 2. Ищем синтаксис маркдауна ![alt](src) (ленивый поиск `.*?` внутри скобок)
+    md_img_matches = re.findall(r'(!\[[^\]]*?\]\(([^)]+?)\))', md_content)
+    for full_tag, src in md_img_matches:
+        # Отсекаем возможный title в кавычках внутри скобок, берем только путь
+        clean_src = src.strip().split()[0] if src.strip() else ""
         original_images.append((clean_src, full_tag.strip()))
 
     # Парсинг и перевод через BeautifulSoup
@@ -182,25 +182,26 @@ for input_path in files_to_translate:
         strip=['script', 'style']
     )
     
-    # Сначала стандартизируем все сгенерированные markdownify картинки в формат <img />
+    # Стандартизируем все маркдаун-картинки от markdownify в формат <img /> перед подсчетом
     markdown_img_regex = r'!\[(.*?)\]\((.*?)\)'
     def replace_with_html_img(match):
         alt_text = match.group(1)
-        img_src = match.group(2).split()[0].strip() if match.group(2) else ""
-        return f'<img src="{img_src}" alt="{alt_text}" />'
+        # Безопасно вытаскиваем только путь к картинке
+        src_part = match.group(2).strip().split()[0] if match.group(2).strip() else ""
+        return f'<img src="{src_part}" alt="{alt_text}" />'
     
     translated_md = re.sub(markdown_img_regex, replace_with_html_img, translated_md)
 
     # =========================================================================
-    # ШАГ 2 АЛГОРИТМА: Собираем картинки из уже переведенного текста
+    # ШАГ 2 АЛГОРИТМА: Собираем картинки из уже переведенного текста (После перевода)
     # =========================================================================
     translated_images = []
-    translated_img_matches = re.findall(r'(<img\s+[^>]*src=["\']([^"\']+)["\'][^>]*>)', translated_md)
+    translated_img_matches = re.findall(r'(<img\s+[^>]*?src=["\']([^"\']+)["\'][^>]*?>)', translated_md)
     for full_tag, src in translated_img_matches:
         translated_images.append((src.strip(), full_tag.strip()))
 
     # =========================================================================
-    # ШАГ 3 АЛГОРИТМА: Сверяем количество и точечно возвращаем оригиналы
+    # ШАГ 3 АЛГОРИТМА: Сравнение числа файлов и замена на оригинал
     # =========================================================================
     if len(original_images) == len(translated_images):
         # Если количество совпало, последовательно заменяем теги на оригинальные
@@ -208,12 +209,12 @@ for input_path in files_to_translate:
             trans_src, trans_full_tag = translated_images[i]
             orig_src, orig_full_tag = original_images[i]
             
-            # Дополнительная проверка безопасности: пути к картинкам должны совпадать
+            # Проверка безопасности: пути к файлам картинок должны совпадать
             if trans_src == orig_src:
-                # Меняем только первое вхождение текущего тега, чтобы не испортить дубликаты
+                # Третий аргумент `1` гарантирует замену только ОДНОГО (текущего) вхождения
                 translated_md = translated_md.replace(trans_full_tag, orig_full_tag, 1)
     else:
-        print(f"  Предупреждение: Дисбаланс картинок ({len(original_images)} vs {len(translated_images)}). Оригинальные размеры не восстановлены.")
+        print(f"  Предупреждение: Дисбаланс картинок ({len(original_images)} в исходном vs {len(translated_images)} в переведенном). Размеры не восстановлены.")
 
     # Очистка дублирующихся переносов строк
     translated_md = re.sub(r'\n{3,}', '\n\n', translated_md)
@@ -223,5 +224,7 @@ for input_path in files_to_translate:
 
     print(f"Успешно сохранен перевод: {output_path}")
     successful_count += 1
+
+
 
 print(f"\nВсе обнаруженные файлы успешно обработаны! Всего переведено: {successful_count}")
