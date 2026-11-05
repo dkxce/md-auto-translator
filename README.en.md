@@ -386,6 +386,7 @@ Priority table:
 md-auto-translator/
 ├── action.yml              # composite action (главный вход)
 ├── translate_html_tree.py  # скрипт перевода RU→EN
+├── convert_md_to_docx.py   # скрипт конвертации .md→.docx
 └── sample.md               # пример workflow вызова
 ```
 
