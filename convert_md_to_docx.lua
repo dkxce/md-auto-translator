@@ -8,10 +8,26 @@ local function is_inside_table(el)
               -- мы можем безопасно страховать картинки.
 end
 
--- 1. ХЭНДЛЕР ДЛЯ HTML ТЕГОВ <img ... /> (Остается для подстраховки)
+-- Функция для безопасного кодирования путей с пробелами
+local function safe_src(src)
+  if not src then return nil end
+  -- Используем стандартную утилиту Pandoc для URL-encoding (пробелы станут %20)
+  -- Проверяем оба возможных расположения функции в разных версиях Pandoc
+  local encode = (pandoc.text and pandoc.text.url_encode) or (pandoc.utils and pandoc.utils.url_encode)
+  if encode then
+    return encode(src)
+  else
+    -- Фолбек, если старая версия Pandoc: вручную меняем пробелы на %20
+    return string.gsub(src, " ", "%%20")
+  end
+end
+
+-- 1. ХЭНДЛЕР ДЛЯ HTML ТЕГОВ <img ... />
 function RawInline(el)
   if el.format == "html" and el.text:lower():match("^<img") then
-    local src = el.text:match('src%s*=%s*["\'\\]*([^%s"\'\\]+)')
+    -- Ищем src, который находится внутри одинарных (') или двойных (") кавычек.
+    -- Пленяем всё содержимое кавычек, включая пробелы!
+    local src = el.text:match('src%s*=%s*"([^"]+)"') or el.text:match("src%s*=%s*'([^']+)'")
     
     local width_val = el.text:match('width%s*=%s*["\'\\]*(%d+)')
     local height_val = el.text:match('height%s*=%s*["\'\\]*(%d+)')
@@ -30,14 +46,25 @@ function RawInline(el)
         attr['height'] = string.format("%.3fin", h / 96)
       end
 
+      -- Используем встроенный URL-encode Pandoc, чтобы замаскировать пробелы для Word
+      local encode = (pandoc.text and pandoc.text.url_encode) or (pandoc.utils and pandoc.utils.url_encode)
+      if encode then
+        src = encode(src)
+      else
+        src = string.gsub(src, " ", "%%20")
+      end
+
       return pandoc.Image({}, src, "", attr)
     end
   end
 end
 
+
 -- 2. ХЭНДЛЕР ДЛЯ НАТИВНОГО MARKDOWN ![alt](src)
 function Image(el)
-  local lower_src = el.src:lower()
+  -- Делаем копию оригинального пути до изменения регистра, чтобы не испортить путь к файлу
+  local original_src = el.src
+  local lower_src = original_src:lower()
   
   -- 1. Сначала ищем классический паттерн "Ширина x Высота" (например, 48x38)
   local w_val, h_val = lower_src:match("(%d+)x(%d+)")
@@ -49,6 +76,9 @@ function Image(el)
     -- Ищем высоту: паттерны вида "_h38", "-h38" или "x38" перед расширением
     h_val = lower_src:match("[_-]h(%d+)") or lower_src:match("x(%d+)[._-]")
   end
+  
+  -- ПОБЕДА НАД ПРОБЕЛАМИ: энкодим исходный путь с пробелами
+  el.src = safe_src(original_src)
   
   -- Назначаем атрибуты на основе того, что удалось раскопать в имени файла
   if w_val and h_val then
@@ -68,6 +98,8 @@ function Image(el)
     el.attributes['width'] = string.format("%.3fin", h / 96)
     el.attributes['height'] = string.format("%.3fin", h / 96)
     return el
-  end  
+  end 
+  
+  -- Если размеров нет, всё равно возвращаем объект с исправленным путем
+  return el
 end
-
