@@ -34,8 +34,10 @@ def convert_file(file_path, skip_patterns):
 
     print(f"Конвертация: {file_path} -> {out_path}")
     try:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        lua_filter_path = os.path.join(script_dir, "convert_md_to_docx.lua")
         subprocess.run(
-            ["pandoc", file_path, "--lua-filter=convert_md_to_docx.lua", "-o", out_path], 
+            ["pandoc", file_path, f"--lua-filter={lua_filter_path}", "-o", out_path], 
             check=True
         )
         return True
