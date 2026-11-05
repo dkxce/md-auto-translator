@@ -4,6 +4,7 @@ import sys
 import glob
 import fnmatch
 import markdown
+import uuid  # Добавлен для генерации UUID-якорей
 from bs4 import BeautifulSoup, NavigableString
 from markdownify import markdownify as mdify
 from transliterate import slugify
@@ -33,6 +34,9 @@ def apply_skips(paths, skip_patterns):
 def translate_text(text):
     clean_text = text.strip()
     if not clean_text or clean_text.isdigit() or len(clean_text) < 2:
+        return text
+    # ЗАЩИТА: Если в тексте содержится наш маркер, не отправляем его в переводчик
+    if "_INDEXED_IMAGE_" in clean_text:
         return text
     try:
         return argostranslate.translate.translate(clean_text, "ru", "en")
@@ -119,34 +123,32 @@ for input_path in files_to_translate:
         md_content = f.read()
 
     # =========================================================================
-    # ШАГ 1 АЛГОРИТМА: Раздельно собираем оригинальные HTML и MD картинки до перевода
+    # ШАГ 1: Текстовое хеширование картинок в кастомный маркер с UUID
     # =========================================================================
-    orig_html_images = []  # Для тегов <img /> с размерами
-    orig_md_images = []    # Для стандартной разметки ![alt](src)
-    
-    IMAGE_EXTENSIONS = ('.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.bmp')
+    image_vault = {}
 
-    # 1. Вытаскиваем исходные HTML теги <img>
-    html_matches = re.findall(r'(<img\s+[^>]*?src=["\']([^"\']+)["\'][^>]*?>)', md_content, re.IGNORECASE)
-    for full_tag, src in html_matches:
-        orig_html_images.append((src.strip(), full_tag.strip()))
+    def stash_image(match):
+        full_tag = match.group(0)
+        # Генерируем UUID
+        clean_uuid = str(uuid.uuid4())
+        # Собираем маркер вида _INDEXED_IMAGE_<UUID>_
+        text_marker = f"_INDEXED_IMAGE_<{clean_uuid}>_"
+        image_vault[clean_uuid] = full_tag
+        return text_marker
 
-    # 2. Вытаскиваем исходную разметку Маркдауна ![]()
-    md_matches = re.findall(r'(!\[[^\]]*?\]\(([^)]+?)\))', md_content)
-    for full_tag, src in md_matches:
-        # Убрали .split(), теперь пути с пробелами обрабатываются целиком
-        clean_src = src.strip().strip('"').strip("'") if src.strip() else ""
-        if clean_src.lower().endswith(IMAGE_EXTENSIONS):
-            orig_md_images.append((clean_src, full_tag.strip()))
+    # 1. Заменяем HTML-картинки <img ... />
+    md_content = re.sub(r'<img\s+[^>]*?>', stash_image, md_content, flags=re.IGNORECASE)
 
-    # Общее число картинок до перевода
-    total_original_count = len(orig_html_images) + len(orig_md_images)
+    # 2. Заменяем Markdown-картинки ![alt](src)
+    md_content = re.sub(r'!\[[^\]]*?\]\([^)]+?\)', stash_image, md_content)
 
-    # Перевод структуры документа через BeautifulSoup
+    # =========================================================================
+    # ШАГ 2: Перевод структуры документа через BeautifulSoup
+    # =========================================================================
     html_content = markdown.markdown(md_content, extensions=['tables', 'fenced_code'])
     soup = BeautifulSoup(html_content, "html.parser")
 
-    # Шаг 1: Обработка заголовков
+    # Обработка заголовков
     for heading in soup.find_all(re.compile(r'^h[1-6]$')):
         orig_text = heading.get_text()
         orig_slug = orig_text.lower().replace(" ", "-")
@@ -163,13 +165,10 @@ for input_path in files_to_translate:
         anchor_tag = soup.new_tag("a", attrs={"name": new_slug})
         heading.append(anchor_tag)
 
-    # Шаг 2: Перевод контента, атрибутов alt у картинок и обновление локальных ссылок
+    # Перевод контента и обновление локальных ссылок
     for tag in soup.find_all(True):
         if tag.name in ['code', 'pre']:
             continue
-            
-        if tag.name == 'img' and tag.has_attr('alt'):
-            tag['alt'] = translate_text(tag['alt'])
             
         if tag.name == 'a' and tag.has_attr('href'):
             href = tag['href'].lower()
@@ -181,69 +180,24 @@ for input_path in files_to_translate:
                 if tag.name not in ['code', 'pre'] and child.parent.name not in ['code', 'pre']:
                     child.replace_with(translate_text(child))
 
-    # Шаг 3: Сборка базового Markdown текста из HTML структуры
+    # Сборка базового Markdown текста из HTML структуры
     translated_html = str(soup)
     translated_md = mdify(
         translated_html, 
         heading_style="ATX", 
         strip=['script', 'style']
     )
-    
-    # Принудительно приводим все сгенерированные маркдауном картинки к промежуточному формату <img />
-    markdown_img_regex = r'!\[(.*?)\]\((.*?)\)'
-    def replace_with_html_img(match):
-        alt_text = match.group(1)
-        # Убрали .split(), чтобы сохранить целостность путей с пробелами
-        src_part = match.group(2).strip().strip('"').strip("'") if match.group(2).strip() else ""
-        return f'<img src="{src_part}" alt="{alt_text}" />'
-    
-    translated_md = re.sub(markdown_img_regex, replace_with_html_img, translated_md)
 
     # =========================================================================
-    # ШАГ 2 АЛГОРИТМА: Находим все картинки в переведенном тексте после сборки
+    # ШАГ 4: Дехеширование по UUID (Устойчивое к экранированию markdownify)
     # =========================================================================
-    translated_images = []
-    translated_img_matches = re.findall(r'(<img\s+[^>]*?src=["\']([^"\']+)["\'][^>]*?>)', translated_md)
-    for full_tag, src in translated_img_matches:
-        translated_images.append((src.strip(), full_tag.strip()))
+    # Перебираем сохраненные UUID и заменяем любые вариации маркера, которые 
+    # мог сгенерировать mdify: с бэкслешами (\_) или с HTML сущностями (&lt; / &gt;)
+    for clean_uuid, original_tag in image_vault.items():
+        # Регулярка ищет маркер, прощая экранирование символов и сущностей HTML
+        pattern = rf'\\?_INDEXED\\?_IMAGE\\?_(?:<|&lt;){clean_uuid}(?:>|&gt;)\\?_'
+        translated_md = re.sub(pattern, original_tag, translated_md)
 
-    # Общее число картинок после перевода
-    total_translated_count = len(translated_images)
-
-    # =========================================================================
-    # ШАГ 3 АЛГОРИТМА: Точное поштучное сравнение и восстановление оригинала
-    # =========================================================================
-    if total_original_count == total_translated_count:
-        html_idx = 0
-        md_idx = 0
-        
-        # Перебираем все полученные в переведенном файле картинки по очереди их появления
-        for i in range(total_translated_count):
-            trans_src, trans_full_tag = translated_images[i]
-            
-            # Проверяем, какой тип картинки шел в оригинале по очереди
-            # Сначала проверяем список оригинальных HTML-изображений
-            if html_idx < len(orig_html_images) and orig_html_images[html_idx][0] == trans_src:
-                orig_src, orig_full_tag = orig_html_images[html_idx]
-                # Восстанавливаем оригинальный HTML тег <img ... width="..." />
-                translated_md = translated_md.replace(trans_full_tag, orig_full_tag, 1)
-                html_idx += 1
-                
-            # Если не совпало, значит по очереди в оригинале шла Markdown-картинка ![]()
-            elif md_idx < len(orig_md_images) and orig_md_images[md_idx][0] == trans_src:
-                orig_src, orig_full_tag = orig_md_images[md_idx]
-                
-                # Извлекаем переведенный alt-текст из текущего тега, чтобы не потерять перевод
-                alt_match = re.search(r'alt=["\'](.*?)["\']', trans_full_tag)
-                trans_alt = alt_match.group(1) if alt_match else ""
-                
-                # Собираем чистый маркдаун обратно с переведенным альтом: ![Переведенный текст](путь)
-                restored_md_tag = f"![{trans_alt}]({orig_src})"
-                translated_md = translated_md.replace(trans_full_tag, restored_md_tag, 1)
-                md_idx += 1
-    else:
-        print(f"  Предупреждение: Дисбаланс картинок ({total_original_count} в исходном vs {total_translated_count} в переведенном). Размеры не восстановлены.")
- 
     # Очистка дублирующихся переносов строк
     translated_md = re.sub(r'\n{3,}', '\n\n', translated_md)
     
