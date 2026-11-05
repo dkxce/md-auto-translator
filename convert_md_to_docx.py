@@ -36,8 +36,21 @@ def convert_file(file_path, skip_patterns):
     try:
         script_dir = os.path.dirname(os.path.abspath(__file__))
         lua_filter_path = os.path.join(script_dir, "convert_md_to_docx.lua")
+        
+        # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ ДЛЯ PANDOC:
+        # Указываем папки для поиска картинок. 
+        # Передаем текущую папку файла и корень репозитория (через разделитель путей ОС)
+        resource_paths = f"{os.path.dirname(file_path) or '.'}{os.path.pathsep}."
+
         subprocess.run(
-            ["pandoc", file_path, f"--lua-filter={lua_filter_path}", "-o", out_path], 
+            [
+                "pandoc", 
+                file_path, 
+                f"--lua-filter={lua_filter_path}", 
+                f"--resource-path={resource_paths}",  # Добавлен поиск ресурсов
+                "-o", 
+                out_path
+            ], 
             check=True
         )
         return True
