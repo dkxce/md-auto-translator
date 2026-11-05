@@ -8,10 +8,13 @@ function RawInline(el)
       local attr = {}
       
       if width then 
-        attr['width'] = width:gsub("px", "") 
+        local clean_width = width:gsub("px", ""):gsub("%s+", "")
+        attr['width'] = clean_width .. "px" 
       end
+      
       if height then 
-        attr['height'] = height:gsub("px", "") 
+        local clean_height = height:gsub("px", ""):gsub("%s+", "")
+        attr['height'] = clean_height .. "px" 
       end
       
       return pandoc.Image({}, src, "", attr)
