@@ -154,8 +154,9 @@ for input_path in files_to_translate:
         orig_slug = orig_text.lower().replace(" ", "-")
         orig_slug = re.sub(r'[^a-z0-9-_]', '', orig_slug)
         
+        # Переводим текст заголовка
         for string in heading.find_all(string=True):
-            if isinstance(string, NavigableString):
+            if isinstance(string, NavigableString) and string.strip():
                 string.replace_with(translate_text(string))
         
         trans_text = heading.get_text()
@@ -165,20 +166,30 @@ for input_path in files_to_translate:
         anchor_tag = soup.new_tag("a", attrs={"name": new_slug})
         heading.append(anchor_tag)
 
-    # Шаг 2: Перевод контента и обновление локальных ссылок
-    for tag in soup.find_all(True):
-        if tag.name in ['code', 'pre']:
+    # Шаг 2: КРЕДО ПЕРЕВОДА — Переводим строго конечные текстовые ноды (string=True),
+    # исключая дублирование обработки и блоки кода/ссылок.
+    for text_node in soup.find_all(string=True):
+        if not text_node.strip():
             continue
             
-        if tag.name == 'a' and tag.has_attr('href'):
-            href = tag['href'].lower()
-            if href.startswith('#') and href in anchor_mapping:
-                tag['href'] = anchor_mapping[href]
+        # Проверяем, не лежит ли текст внутри тегов кода или pre
+        parent_names = [p.name for p in text_node.parents]
+        if 'code' in parent_names or 'pre' in parent_names:
+            continue
+            
+        # Заголовки мы уже обработали на Шаге 1, пропускаем их текстовые ноды здесь
+        if any(re.match(r'^h[1-6]$', name) for name in parent_names):
+            continue
 
-        for child in tag.children:
-            if isinstance(child, NavigableString) and child.strip():
-                if tag.name not in ['code', 'pre'] and child.parent.name not in ['code', 'pre']:
-                    child.replace_with(translate_text(child))
+        # Обновление локальных ссылок (если родитель — тег 'a')
+        if text_node.parent.name == 'a' and text_node.parent.has_attr('href'):
+            href = text_node.parent['href'].lower()
+            if href.startswith('#') and href in anchor_mapping:
+                text_node.parent['href'] = anchor_mapping[href]
+
+        # Выполняем чистый перевод текстового узла
+        translated_node_text = translate_text(text_node)
+        text_node.replace_with(translated_node_text)
 
     # Шаг 3: Сборка базового Markdown текста из HTML структуры
     translated_html = str(soup)
