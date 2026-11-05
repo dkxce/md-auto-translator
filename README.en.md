@@ -50,7 +50,7 @@ In order for an external repository to pull the action, its workflow should incl
 
 ### 1. Translation and conversion of all`. md`
 
-No file details. Autodetection is used: everything is translated and converted`.md`except`*.en.md`.
+No file details. Autodetection is used: all are translated and converted`.md`except`*.en.md`.
 
 ```
 name: Auto Translate Docs
@@ -167,7 +167,7 @@ jobs:
 
 ### With the indication of files for conversion (without translation)
 
-Only the listed files are converted, the transfer is disabled (`translate_skip: '**'`).
+Convert only the listed files, the transfer is disabled`translate_skip: '**'`).
 
 ```
 name: Auto Translate Docs
@@ -387,6 +387,7 @@ md-auto-translator/
 ├── action.yml              # composite action (главный вход)
 ├── translate_html_tree.py  # скрипт перевода RU→EN
 ├── convert_md_to_docx.py   # скрипт конвертации .md→.docx
+├── convert_md_to_docx.lua  # скрипт конвертации img в .md→.docx
 └── sample.md               # пример workflow вызова
 ```
 
