@@ -34,7 +34,10 @@ def convert_file(file_path, skip_patterns):
 
     print(f"Конвертация: {file_path} -> {out_path}")
     try:
-        subprocess.run(["pandoc", file_path, "-o", out_path], check=True)
+        subprocess.run(
+            ["pandoc", file_path, "--lua-filter=convert_md_to_docx.lua", "-o", out_path], 
+            check=True
+        )
         return True
     except Exception as e:
         print(f"Ошибка при конвертации {file_path}: {e}")
